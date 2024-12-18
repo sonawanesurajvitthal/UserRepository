@@ -7,7 +7,9 @@ import com.user.exception.UserRequiredFields;
 import com.user.reposiotry.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -18,10 +20,8 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
 
     @Override
-    public User createUser(User user) {
-        if(user.getName() == null){
-            throw new UserRequiredFields(ApiConstants.NAME_FIELD_REQUIRED);
-        }
+    public User createUser(User user, MultipartFile file) throws IOException {
+        user.setFile(file.getBytes());
         return userRepository.save(user);
     }
 

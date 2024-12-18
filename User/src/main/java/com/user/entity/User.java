@@ -1,9 +1,6 @@
 package com.user.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 @Entity
 public class User {
@@ -18,7 +15,20 @@ public class User {
 
     private String email;
 
+    @Lob
+    private byte[] file;
+
+    public byte[] getFile() {
+        return file;
+    }
+
+    public void setFile(byte[] file) {
+        this.file = file;
+    }
+
     private String address;
+
+
 
     public int getId() {
         return id;
