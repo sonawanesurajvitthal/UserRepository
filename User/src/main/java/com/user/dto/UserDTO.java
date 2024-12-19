@@ -1,6 +1,9 @@
 package com.user.dto;
 
+import com.user.entity.Loan;
 import com.user.entity.User;
+
+import java.util.List;
 
 public class UserDTO {
 
@@ -13,6 +16,36 @@ public class UserDTO {
     private String email;
 
     private String address;
+
+    private String imagesName;
+
+    private boolean isActive;
+
+    private List<Loan> loans;
+
+    public List<Loan> getLoans() {
+        return loans;
+    }
+
+    public void setLoans(List<Loan> loans) {
+        this.loans = loans;
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public void setActive(boolean active) {
+        isActive = active;
+    }
+
+    public String getImagesName() {
+        return imagesName;
+    }
+
+    public void setImagesName(String imagesName) {
+        this.imagesName = imagesName;
+    }
 
     public int getId() {
         return id;
@@ -54,13 +87,4 @@ public class UserDTO {
         this.address = address;
     }
 
-    public UserDTO convertUserToDTO(User user){
-        UserDTO userDTO = new UserDTO();
-        userDTO.setId(user.getId());
-        userDTO.setName(user.getName());
-        userDTO.setAddress(user.getAddress());
-        userDTO.setEmail(user.getEmail());
-        userDTO.setPhone(user.getPhone());
-        return userDTO;
-    }
 }

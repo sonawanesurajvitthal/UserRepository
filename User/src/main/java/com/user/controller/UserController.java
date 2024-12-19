@@ -3,6 +3,7 @@ package com.user.controller;
 import com.user.constants.ApiConstants;
 import com.user.dto.UserDTO;
 import com.user.entity.User;
+import com.user.response.AppResponse;
 import com.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,9 +39,12 @@ public class UserController {
             }
     )
     @GetMapping("/{id}")
-    public ResponseEntity<UserDTO> getUser(@PathVariable int id){
-        UserDTO userDTO = new UserDTO().convertUserToDTO(userService.getUserById(id));
-        return ResponseEntity.status(HttpStatus.OK).body(userDTO);
+    public ResponseEntity<AppResponse<UserDTO>> getUser(@PathVariable int id){
+        AppResponse<UserDTO> response =
+                new AppResponse<>(ApiConstants.USER_FETCH,
+                        200,
+                        userService.getUserById(id));
+        return new  ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @Operation(
@@ -58,11 +62,13 @@ public class UserController {
             }
     )
     @PostMapping
-    public ResponseEntity<UserDTO> saveUser(@ModelAttribute User user, @RequestParam("file") MultipartFile file) throws IOException {
-
-
-        UserDTO userDTO = new UserDTO().convertUserToDTO(userService.createUser(user, file));
-        return ResponseEntity.status(HttpStatus.OK).body(userDTO);
+    public ResponseEntity<AppResponse<UserDTO>> saveUser(@ModelAttribute UserDTO userDTO,
+                                                         @RequestParam("image") MultipartFile file) throws IOException {
+        AppResponse<UserDTO> response =
+                new AppResponse<>(ApiConstants.USER_CREATED,
+                        201,
+                        userService.createUser(userDTO, file));
+        return new  ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @Operation(
@@ -80,9 +86,12 @@ public class UserController {
             }
     )
     @PutMapping
-    public ResponseEntity<UserDTO> updateUser(@RequestBody User user){
-        UserDTO userDTO = new UserDTO().convertUserToDTO(userService.updateUser(user));
-        return ResponseEntity.status(HttpStatus.OK).body(userDTO);
+    public ResponseEntity<AppResponse<UserDTO>> updateUser(@RequestBody UserDTO userDTO){
+        AppResponse<UserDTO> response =
+                new AppResponse<>(ApiConstants.USER_UPDATE,
+                200,
+                        userService.updateUser(userDTO));
+        return new  ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @Operation(
@@ -97,13 +106,12 @@ public class UserController {
             }
     )
     @GetMapping
-    public ResponseEntity<List<UserDTO>> listUser(){
-        List<UserDTO> listUserDTO = new ArrayList<>();
-        List<User> list =userService.listOfUser();
-        for(User user: list){
-            listUserDTO.add(new UserDTO().convertUserToDTO(user));
-        }
-        return ResponseEntity.status(HttpStatus.OK).body(listUserDTO);
+    public ResponseEntity<AppResponse<List<UserDTO>>> listUser(){
+        AppResponse<List<UserDTO>> response =
+                new AppResponse<>(ApiConstants.ALL_USER_FETCH,
+                        200,
+                        userService.listOfUser());
+        return new  ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @Operation(
@@ -121,9 +129,13 @@ public class UserController {
             }
     )
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteUser(@PathVariable int id){
+    public ResponseEntity<AppResponse<String>> deleteUser(@PathVariable int id){
         userService.deleteUserById(id);
-        return ResponseEntity.status(HttpStatus.OK).body(ApiConstants.DELETE_SUCCESSFULLY);
+        AppResponse<String> response =
+                new AppResponse<>(ApiConstants.DELETE_SUCCESSFULLY,
+                        203,
+                        "No Contain");
+        return new ResponseEntity<>(response, HttpStatus.NO_CONTENT);
     }
 
 }

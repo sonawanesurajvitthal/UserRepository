@@ -1,6 +1,9 @@
 package com.user.entity;
 
 import jakarta.persistence.*;
+import jakarta.ws.rs.DefaultValue;
+
+import java.util.List;
 
 @Entity
 public class User {
@@ -15,20 +18,40 @@ public class User {
 
     private String email;
 
-    @Lob
-    private byte[] file;
-
-    public byte[] getFile() {
-        return file;
-    }
-
-    public void setFile(byte[] file) {
-        this.file = file;
-    }
 
     private String address;
 
+    private String imagesName;
 
+
+    private boolean isActive;
+
+    @Transient
+    private List<Loan> loans;
+
+    public List<Loan> getLoans() {
+        return loans;
+    }
+
+    public void setLoans(List<Loan> loans) {
+        this.loans = loans;
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public void setActive(boolean active) {
+        isActive = active;
+    }
+
+    public String getImagesName() {
+        return imagesName;
+    }
+
+    public void setImagesName(String imagesName) {
+        this.imagesName = imagesName;
+    }
 
     public int getId() {
         return id;

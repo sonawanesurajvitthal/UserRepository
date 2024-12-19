@@ -1,5 +1,6 @@
 package com.user.service;
 
+import com.user.dto.UserDTO;
 import com.user.entity.User;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -8,13 +9,13 @@ import java.util.List;
 
 public interface UserService {
 
-    public User createUser(User user, MultipartFile file) throws IOException;
+    public UserDTO createUser(UserDTO user, MultipartFile file) throws IOException;
 
-    public List<User> listOfUser();
+    public List<UserDTO> listOfUser();
 
-    public User getUserById(int id);
+    public UserDTO getUserById(int id);
 
-    public User updateUser(User user);
+    public UserDTO updateUser(UserDTO user);
 
     public void deleteUserById(int id);
 }
