@@ -1,7 +1,6 @@
 package com.user.dto;
 
 import com.user.entity.Loan;
-import com.user.entity.User;
 
 import java.util.List;
 

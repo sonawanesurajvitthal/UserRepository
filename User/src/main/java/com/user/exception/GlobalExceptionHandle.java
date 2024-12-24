@@ -1,5 +1,6 @@
 package com.user.exception;
 
+import com.user.response.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -9,13 +10,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandle {
 
     @ExceptionHandler(UserRequiredFields.class)
-    public ResponseEntity<String> handleUserRequiredFields(UserRequiredFields exception){
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    public ResponseEntity<ErrorResponse> handleUserRequiredFields(UserRequiredFields exception){
+        return new ResponseEntity<>(new ErrorResponse(404, exception.getMessage()), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(UserIdNotFoundException.class)
-    public ResponseEntity<String> handleUserIdNotFound(UserIdNotFoundException exception){
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exception.getMessage());
+    public ResponseEntity<ErrorResponse> handleUserIdNotFound(UserIdNotFoundException exception){
+        return new ResponseEntity<>(new ErrorResponse(404, exception.getMessage()), HttpStatus.NOT_FOUND);
     }
 
 }

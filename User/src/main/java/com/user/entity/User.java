@@ -1,7 +1,6 @@
 package com.user.entity;
 
 import jakarta.persistence.*;
-import jakarta.ws.rs.DefaultValue;
 
 import java.util.List;
 
