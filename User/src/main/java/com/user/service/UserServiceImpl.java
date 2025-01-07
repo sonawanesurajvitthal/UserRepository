@@ -3,10 +3,14 @@ package com.user.service;
 import com.user.constants.ApiConstants;
 import com.user.domain.request.CreateUserRequestDto;
 import com.user.domain.response.UserResponseDto;
-import com.user.dto.UserMapperService;
+import com.user.entity.Loan;
+import com.user.exception.FileUploadException;
+import com.user.exception.PageNumberException;
+import com.user.exception.UserRequiredFields;
+import com.user.exteranl.LoanClient;
+import com.user.mapper.UserMapperImpl;
 import com.user.entity.User;
 import com.user.exception.UserIdNotFoundException;
-import com.user.exteranl.LoanService;
 import com.user.repository.UserRepository;
 import com.user.response.AppResponse;
 import org.apache.logging.log4j.LogManager;
@@ -16,6 +20,8 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -36,15 +43,15 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
 
-    private final LoanService loanService;
 
+    private final UserMapperImpl userMapperImpl;
 
-    private final UserMapperService userMapperService;
+    private final LoanClient loanClient;
 
-    public UserServiceImpl(UserMapperService userMapperService, LoanService loanService, UserRepository userRepository){
-        this.userMapperService = userMapperService;
-        this.loanService = loanService;
+    public UserServiceImpl(UserRepository userRepository,                           UserMapperImpl userMapperImpl, LoanClient loanClient){
         this.userRepository = userRepository;
+        this.userMapperImpl = userMapperImpl;
+        this.loanClient = loanClient;
     }
 
 
@@ -56,23 +63,34 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public AppResponse<UserResponseDto> createUser(CreateUserRequestDto createUserRequestDto, MultipartFile file) throws IOException {
-        User user = userMapperService.getUser(createUserRequestDto);
-        try {
-            Path uploadPath = Paths.get(uploadUrl);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+        if(file != null) {
+            try {
+                Path uploadPath = Paths.get(uploadUrl);
+                if (!Files.exists(uploadPath)) {
+                    Files.createDirectories(uploadPath);
+                }
+                String fileName = file.getOriginalFilename();
+                if (fileName != null) {
+                    Path filePath = uploadPath.resolve(fileName);
+                    file.transferTo(filePath.toFile());
+                    createUserRequestDto.setImagesName(fileName);
+                }
+            } catch (IOException e) {
+                log.error("e: ", e);
+                throw new FileUploadException(ApiConstants.UPLOAD_FILE_FAILED);
             }
-            String fileName = file.getOriginalFilename();
-            assert fileName != null;
-            Path filePath = uploadPath.resolve(fileName);
-            file.transferTo(filePath.toFile());
-            user.setImagesName(fileName);
-            log.info("Image Upload Successfully {}", fileName);
-        } catch (IOException e) {
-            log.error("e: ", e);
         }
-        user.setActive(true);
-        UserResponseDto userResponseDto = userMapperService.getResponseDto(userRepository.save(user));
+        if(!createUserRequestDto.isActive()){
+            createUserRequestDto.setActive(true);
+        }
+        User user = userRepository.save(userMapperImpl.requestToUser(createUserRequestDto));
+        if(user.getLoans() != null ) {
+            user.setLoans(user.getLoans().stream().map(loan -> {
+                loan.setUserId(user.getId());
+                return Objects.requireNonNull(loanClient.createLoan(loan).getBody()).getData();
+            }).toList());
+        }
+        UserResponseDto userResponseDto = userMapperImpl.userToResponse(user);
         return  new AppResponse<>(ApiConstants.USER_CREATED, 201, userResponseDto);
     }
 
@@ -83,9 +101,13 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public AppResponse<List<UserResponseDto>> listOfUser() {
-
-        List<User> userList = userRepository.findAll().stream().toList();
-        List<UserResponseDto> listOfUserDTO = userList.stream().map(userMapperService::getResponseDto).toList();
+        List<User> userList = userRepository.findAll().stream().filter(User::isActive)
+                .map(user -> {
+                    user.setLoans(Objects.requireNonNull(loanClient.findLoanByUserId(user.getId()).getBody()).getData());
+                    return user;
+                })
+                .toList();
+        List<UserResponseDto> listOfUserDTO = userList.stream().map(userMapperImpl::userToResponse).toList();
         return new AppResponse<>(ApiConstants.ALL_USER_FETCH, 200, listOfUserDTO);
     }
 
@@ -99,10 +121,13 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public AppResponse<UserResponseDto> getUserById(int userId) {
-        User user = userRepository.findById(userId).filter(User::isActive)
-                .orElseThrow(()-> new UserIdNotFoundException(ApiConstants.USER_ID_NOT_FOUND+userId));
-        user.setLoans(loanService.listOfLoansByUserId(user.getId()));
-        UserResponseDto userResponseDto = userMapperService.getResponseDto(user);
+        User user = userRepository.findById(userId)
+                .orElseThrow(()-> new UserIdNotFoundException(ApiConstants.USER_ID_NOT_FOUND + userId));
+        if(!user.isActive()){
+            throw new UserIdNotFoundException(ApiConstants.USER_NOT_ACTIVATED);
+        }
+        user.setLoans(Objects.requireNonNull(loanClient.findLoanByUserId(user.getId()).getBody()).getData());
+        UserResponseDto userResponseDto = userMapperImpl.userToResponse(user);
         return new AppResponse<>(ApiConstants.USER_FETCH, 200, userResponseDto);
     }
 
@@ -116,28 +141,54 @@ public class UserServiceImpl implements UserService {
      * @throws UserIdNotFoundException if no user is found and not active with the given ID.
      */
     @Override
-    public AppResponse<UserResponseDto> updateUser(int userId, CreateUserRequestDto createUserRequestDto) {
-        User user = userMapperService.getUser(createUserRequestDto);
-        User tempUser = userRepository.findById(user.getId())
-                .orElseThrow(()->new UserIdNotFoundException(ApiConstants.USER_ID_NOT_FOUND+user.getId()));
-        if(user.getName() == null){
-            user.setName(tempUser.getName());
+    public AppResponse<UserResponseDto> updateUser(int userId, CreateUserRequestDto createUserRequestDto, MultipartFile file) {
+        User tempUser = userRepository.findById(userId)
+                .orElseThrow(()->new UserIdNotFoundException(ApiConstants.USER_ID_NOT_FOUND + userId));
+        createUserRequestDto.setId(userId);
+        if(createUserRequestDto.getName() == null){
+            createUserRequestDto.setName(tempUser.getName());
         }
-        if(user.getAddress() == null){
-            user.setAddress(tempUser.getAddress());
+        if(createUserRequestDto.getAddress() == null){
+            createUserRequestDto.setAddress(tempUser.getAddress());
         }
-        if(user.getPhone() == null){
-            user.setPhone(tempUser.getPhone());
+        if(createUserRequestDto.getPhone() == null){
+            createUserRequestDto.setPhone(tempUser.getPhone());
         }
-        if(user.getEmail() == null){
-            user.setEmail(tempUser.getEmail());
+        if(createUserRequestDto.getEmail() == null){
+            createUserRequestDto.setEmail(tempUser.getEmail());
         }
-        if(user.getImagesName() == null){
-            user.setImagesName(tempUser.getImagesName());
+        if(createUserRequestDto.getImagesName() == null){
+            createUserRequestDto.setImagesName(tempUser.getImagesName());
+        } else if(file != null) {
+            try {
+                Path uploadPath = Paths.get(uploadUrl);
+                String fileName = file.getOriginalFilename();
+                if (fileName != null) {
+                    Path filePath = uploadPath.resolve(fileName);
+                    file.transferTo(filePath.toFile());
+                    createUserRequestDto.setImagesName(fileName);
+                }
+            } catch (IOException e) {
+                log.error("e: ", e);
+                throw new FileUploadException(ApiConstants.UPLOAD_FILE_FAILED);
+            }
         }
-        UserResponseDto userResponseDto = userMapperService.getResponseDto(userRepository.save(user));
-
-        return new AppResponse<>(ApiConstants.USER_UPDATE, 200, userResponseDto);
+        createUserRequestDto.setActive(tempUser.isActive());
+        if(createUserRequestDto.getLoans() != null){
+            createUserRequestDto.setLoans(createUserRequestDto.getLoans().stream().map(loan->{
+                loan.setUserId(createUserRequestDto.getId());
+                if(loan.getId() == 0){
+                    return Objects.requireNonNull(loanClient.createLoan(loan).getBody()).getData();
+                }
+                return Objects.requireNonNull(loanClient.updateLoan(loan.getId(), loan).getBody()).getData();
+            }).toList());
+        }
+        UserResponseDto userResponseDto = userMapperImpl.userToResponse(
+                userRepository.save(
+                        userMapperImpl.requestToUser(createUserRequestDto)
+                ));
+        userResponseDto.setLoans(createUserRequestDto.getLoans());
+        return new AppResponse<>(ApiConstants.USER_UPDATE, HttpStatus.OK.value(), userResponseDto);
     }
 
     /**
@@ -150,21 +201,36 @@ public class UserServiceImpl implements UserService {
     @Override
     public AppResponse<String> deleteUserById(int userId) {
         User user = userRepository.findById(userId).filter(User::isActive)
-                .orElseThrow(()-> new UserIdNotFoundException(ApiConstants.USER_ID_NOT_FOUND+userId));
+                .orElseThrow(()-> new UserIdNotFoundException(ApiConstants.USER_ID_NOT_FOUND + userId));
         user.setActive(false);
         userRepository.save(user);
-        return new AppResponse<>(ApiConstants.DELETE_SUCCESSFULLY, 203, "Deleted Successfully");
+
+
+        for(Loan loan : Objects.requireNonNull(loanClient.findLoanByUserId(userId).getBody()).getData()){
+            loanClient.deleteById(loan.getId());
+        }
+        return new AppResponse<>(ApiConstants.DELETE_SUCCESSFULLY, 204, ApiConstants.DELETE_SUCCESSFULLY);
     }
 
     //Practice code for test
-    public Page<User> userListOnPagination(int page, int size){
-        userRepository.findAll(PageRequest.of(page, size));
-        return userRepository.findAll(PageRequest.of(page, size));
+    public AppResponse<Page<User>> userListOnPagination(int page, int size){
+        if (page <= 0){
+            throw new PageNumberException(ApiConstants.PAGE_NUMBER_VALIDATION);
+        }
+        Page<User> users = userRepository.findAll(PageRequest.of(page-1, size));
+        return new AppResponse<>(ApiConstants.ALL_USER_FETCH, HttpStatus.OK.value(),users);
     }
 
     @Override
     public Resource getImage(String name){
         File file = new File(uploadUrl +ApiConstants.SLASH+ name);
         return  new FileSystemResource(file);
+    }
+
+    @Override
+    public AppResponse<List<UserResponseDto>> sortUsersByField(String field) {
+       List<User> users = userRepository.findAll(Sort.by(Sort.Direction.DESC, field));
+       List<UserResponseDto> userResponseDtoList = users.stream().map(userMapperImpl::userToResponse).toList();
+       return new AppResponse<>(ApiConstants.ALL_USER_FETCH, HttpStatus.OK.value(), userResponseDtoList);
     }
 }

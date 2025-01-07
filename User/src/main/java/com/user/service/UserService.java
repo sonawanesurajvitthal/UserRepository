@@ -19,11 +19,13 @@ public interface UserService {
 
      AppResponse<UserResponseDto> getUserById(int userId);
 
-     AppResponse<UserResponseDto> updateUser(int userId, CreateUserRequestDto createUserRequestDto);
+     AppResponse<UserResponseDto> updateUser(int userId, CreateUserRequestDto createUserRequestDto, MultipartFile file);
 
      AppResponse<String> deleteUserById(int userId);
 
-     Page<User> userListOnPagination(int page, int size);
+     AppResponse<Page<User>> userListOnPagination(int page, int size);
 
      Resource getImage(String imName);
+
+     AppResponse<List<UserResponseDto>> sortUsersByField(String field);
 }

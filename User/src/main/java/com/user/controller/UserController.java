@@ -1,5 +1,7 @@
 package com.user.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.user.constants.ApiConstants;
 import com.user.domain.request.CreateUserRequestDto;
 import com.user.domain.response.UserResponseDto;
@@ -10,7 +12,9 @@ import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -36,10 +40,33 @@ public class UserController {
 
     private final UserService userService;
 
+    private Logger logger = LoggerFactory.getLogger(UserController.class);
+
     public UserController(UserService userService){
         this.userService = userService;
     }
 
+    /**
+     * Handles the HTTP GET request to get a user by its ID.
+     *
+     * @param userId The ID of the user to be fetched.
+     * @return ResponseEntity containing the fetched User and the HTTP status code.
+     */
+    @Operation(
+            tags = "GET USER",
+            description = "Get User.",
+            responses = {
+                    @ApiResponse(
+                            description = "Success",
+                            responseCode = "200"
+                    ),
+
+            }
+    )
+    @GetMapping(ApiConstants.SLASH_ID)
+    public ResponseEntity<AppResponse<UserResponseDto>> getUserById(@PathVariable("id") int userId){
+        return new ResponseEntity<>(userService.getUserById(userId), HttpStatus.OK);
+    }
 
     /**
      * Handles the HTTP POST request to create a new user.
@@ -49,7 +76,7 @@ public class UserController {
      *
      * @param createUserRequestDto The User object to be created.
      * @param file The image/file of User.
-     * @return ResponseEntity containing the created employee and the HTTP status code.
+     * @return ResponseEntity containing the created User and the HTTP status code.
      */
     @Operation(
             tags = "CREATE USER",
@@ -66,17 +93,18 @@ public class UserController {
             }
     )
     @PostMapping
-    public ResponseEntity<AppResponse<UserResponseDto>> saveUser(@ModelAttribute CreateUserRequestDto createUserRequestDto,
-                                                                 @RequestParam("image") MultipartFile file) throws IOException {
+    public ResponseEntity<AppResponse<UserResponseDto>> saveUser(@RequestParam("user")String userRequestDto,
+                                                                 @RequestParam( value = "file", required = false) MultipartFile file) throws IOException {
+        CreateUserRequestDto createUserRequestDto = new ObjectMapper().readValue(userRequestDto, CreateUserRequestDto.class);
         return new  ResponseEntity<>(userService.createUser(createUserRequestDto, file), HttpStatus.CREATED);
     }
 
     /**
      * Handles the HTTP PUT request to update an existing user's data.
      *
-     * @param userId The ID of the employee to be updated.
-     * @param  createUserRequestDto The employee object containing updated data.
-     * @return ResponseEntity containing the updated employee data or 404 if not found.
+     * @param userId The ID of the user to be updated.
+     * @param  userRequestDto The user object containing updated data.
+     * @return ResponseEntity containing the updated user data or 404 if not found.
      */
     @Operation(
             tags = "UPDATE USER",
@@ -92,9 +120,12 @@ public class UserController {
                     )
             }
     )
-    @PutMapping
-    public ResponseEntity<AppResponse<UserResponseDto>> updateUser(@PathVariable("userId") int userId, @RequestBody CreateUserRequestDto createUserRequestDto){
-        return new  ResponseEntity<>(userService.updateUser(userId, createUserRequestDto), HttpStatus.OK);
+    @PutMapping(ApiConstants.SLASH_ID)
+    public ResponseEntity<AppResponse<UserResponseDto>> updateUser(@PathVariable("id") int userId,
+                                                                   @RequestParam("user") String userRequestDto,
+                                                                   @RequestParam(value = "file", required = false) MultipartFile file) throws JsonProcessingException {
+        CreateUserRequestDto createUserRequestDto = new ObjectMapper().readValue(userRequestDto, CreateUserRequestDto.class);
+        return new  ResponseEntity<>(userService.updateUser(userId, createUserRequestDto, file), HttpStatus.OK);
     }
 
     /**
@@ -116,7 +147,7 @@ public class UserController {
 
             }
     )
-    @GetMapping
+    @GetMapping(ApiConstants.USER_LIST)
     public ResponseEntity<AppResponse<List<UserResponseDto>>> listUser(){
         return new  ResponseEntity<>(userService.listOfUser(), HttpStatus.OK);
     }
@@ -141,9 +172,10 @@ public class UserController {
                     )
             }
     )
-    @DeleteMapping("/{id}")
+    @DeleteMapping(ApiConstants.SLASH_ID)
     public ResponseEntity<AppResponse<String>> deleteUser(@PathVariable("id") int userId){
-        return new ResponseEntity<>(userService.deleteUserById(userId), HttpStatus.NO_CONTENT);
+        AppResponse<String> response = userService.deleteUserById(userId);
+        return new ResponseEntity<>(response, HttpStatus.NO_CONTENT);
     }
 
     @Operation(
@@ -159,19 +191,24 @@ public class UserController {
 
 
     // Practice code
-    @GetMapping("/page/{page}/{size}")
-    public Page<User> listByPagination(@PathVariable("page") int page, @PathVariable("size") int size){
-        return userService.userListOnPagination(page,size);
+    @GetMapping(ApiConstants.PAGE_USER_LIST)
+    public ResponseEntity<AppResponse<Page<User>>> listByPagination(@RequestParam( value = "page", defaultValue = "1") int page,
+                                                                    @RequestParam( value = "size", defaultValue = "10") int size){
+        return new ResponseEntity<>(userService.userListOnPagination(page,size), HttpStatus.OK);
     }
 
 
-
     // Endpoint to fetch the image by filename
-    @GetMapping("/{imageName}")
+    @GetMapping("/image/{imageName}")
     public ResponseEntity<Resource> getImage(@PathVariable("imageName") String imageName) {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG) // Or the appropriate media type
                 .body(userService.getImage(imageName));
+    }
+
+    @GetMapping(ApiConstants.SORT_USER_LIST)
+    public ResponseEntity<AppResponse<List<UserResponseDto>>> sortUsers(@PathVariable("field") String field){
+        return new ResponseEntity<>(userService.sortUsersByField(field), HttpStatus.OK);
     }
 
 }

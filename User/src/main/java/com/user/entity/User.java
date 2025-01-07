@@ -1,6 +1,10 @@
 package com.user.entity;
 
+import com.user.constants.ApiConstants;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
@@ -11,17 +15,19 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
+    @Pattern(regexp = ApiConstants.REGEXP_ONLY_CHARACTERS, message = ApiConstants.ONLY_CHARACTERS)
     private String name;
 
+    @Pattern(regexp = ApiConstants.REGEXP_ONLY_DIGITS, message = ApiConstants.ONLY_DIGITS)
+    @Size(min = 10, max = 10, message = ApiConstants.TEN_DIGITS)
     private String phone;
 
+    @Email
     private String email;
-
 
     private String address;
 
     private String imagesName;
-
 
     private boolean isActive;
 
